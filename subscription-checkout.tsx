@@ -71,14 +71,160 @@ export default function SubscriptionCheckoutPage() {
 
   // Handle payment completion
   const handlePaymentComplete = () => {
-    setCurrentStep("success");
+    // This is called by CheckoutPaymentForm AFTER it has processed payment with Stripe.js (e.g. card elements)
+    // For redirectToCheckout, this success is handled by Stripe redirecting to success_url.
+    // So, this specific function might be for a different flow (e.g. embedded elements success)
+    // or might need to be re-evaluated in context of redirectToCheckout.
+    // For now, if redirectToCheckout is used, success is handled by Stripe's success_url.
+    setCurrentStep("success"); 
   };
 
-  // Handle continue to package creation
   const handleContinueToPackage = () => {
     console.warn(
       'Prevented assignment: `window.location.href = "/package/create"`'
     ) /*TODO: Do not use window.location for navigation. Use react-router instead.*/;
+  };
+  
+  const [clientSecretForPaymentForm, setClientSecretForPaymentForm] = useState<string | null>(null);
+
+
+  // Helper to get user auth details (replace with your actual auth context/logic)
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("sessionToken"); 
+    const userDataString = localStorage.getItem("userData");
+    const userData = userDataString ? JSON.parse(userDataString) : null;
+
+    if (!token || !userData?.id || !userData?.email) {
+      // toast({ title: "Authentication Error", description: "User not authenticated. Please log in.", variant: "destructive" });
+      // Throwing error here to be caught by caller
+      throw new Error("User not authenticated. Please log in.");
+    }
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'x-user-id': userData.id,
+      'x-user-email': userData.email,
+    };
+  };
+
+  // Ensure your Stripe Publishable Key is in your .env file (e.g., VITE_STRIPE_PUBLISHABLE_KEY)
+  const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
+  
+  // Backend API URL
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
+
+  // Placeholder Price IDs from backend/services/stripeService.js (or your .env if frontend has access)
+  const PRO_PLAN_PRICE_ID_FROM_ENV = import.meta.env.VITE_PRO_PLAN_PRICE_ID || 'price_placeholder_pro_plan'; 
+
+  const SIGNATURE_PACK_PRICE_IDS_MAP_FROM_ENV: Record<string, string> = {
+    'bundle-10': import.meta.env.VITE_SIGNATURE_PACK_PRICE_ID_10 || 'price_placeholder_pack_10',
+    'bundle-50': import.meta.env.VITE_SIGNATURE_PACK_PRICE_ID_50 || 'price_placeholder_pack_50',
+    'bundle-100': import.meta.env.VITE_SIGNATURE_PACK_PRICE_ID_100 || 'price_placeholder_pack_100',
+    // Add other bundles if they exist (e.g. bundle-5, bundle-25)
+  };
+
+
+  const handleProceedToStripeCheckout = async () => {
+    setIsProcessing(true);
+    if (!subscriptionSelected && !selectedBundleId) {
+      // toast({ title: "No items selected", description: "Please select a plan or credit bundle.", variant: "destructive" });
+      setIsProcessing(false);
+      return;
+    }
+
+    let authHeaders;
+    try {
+      authHeaders = getAuthHeaders();
+    } catch (error: any) {
+      // toast({ title: "Authentication Error", description: error.message, variant: "destructive" });
+      setIsProcessing(false);
+      return;
+    }
+
+    let sessionId;
+    try {
+      if (activeTab === 'subscription-only' && subscriptionSelected) {
+        // Only Pro subscription
+        const response = await fetch(`${API_BASE_URL}/stripe/create-subscription`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ priceId: PRO_PLAN_PRICE_ID_FROM_ENV }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to create subscription session.');
+        sessionId = data.sessionId;
+      } else if (activeTab === 'subscription-credits') {
+        // This logic needs to be smarter if backend doesn't support mixed cart.
+        // Assuming for now: if credits are selected, it's a credit pack purchase.
+        // If subscription is also selected, it will be a separate transaction or UI should guide it.
+        // The current backend supports one checkout session at a time (either sub or one-time payment).
+        
+        // Scenario 1: Subscription + Credits (User wants both)
+        // This would ideally be handled by a backend that can create a checkout session with both items.
+        // If not, we might need two separate checkouts or guide the user.
+        // For this iteration, let's assume if credits are involved, we prioritize that checkout.
+        // A more robust solution might involve creating the subscription first, then adding credits, or vice-versa.
+        
+        if (selectedBundleId && selectedBundle) {
+            const stripeCreditPriceId = SIGNATURE_PACK_PRICE_IDS_MAP_FROM_ENV[selectedBundleId];
+            if (!stripeCreditPriceId) {
+                throw new Error(`Stripe Price ID not found for credit bundle: ${selectedBundleId}`);
+            }
+            // If subscription is also selected, the current backend creates a *separate* session.
+            // This example will proceed to checkout for credits. User might need to sub separately.
+            // A better UX would be a combined checkout if possible.
+            const response = await fetch(`${API_BASE_URL}/stripe/create-checkout-session-for-packs`, {
+                method: 'POST',
+                headers: authHeaders,
+                body: JSON.stringify({ priceId: stripeCreditPriceId, quantity: 1 }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed to create checkout session for credits.');
+            sessionId = data.sessionId;
+        } else if (subscriptionSelected) { // Only subscription selected under this tab (no bundle)
+             const response = await fetch(`${API_BASE_URL}/stripe/create-subscription`, {
+                method: 'POST',
+                headers: authHeaders,
+                body: JSON.stringify({ priceId: PRO_PLAN_PRICE_ID_FROM_ENV }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed to create subscription session.');
+            sessionId = data.sessionId;
+        } else {
+            // toast({ title: "Selection Error", description: "Please select items to purchase.", variant: "destructive" });
+            setIsProcessing(false);
+            return;
+        }
+      } else {
+        // toast({ title: "Invalid Tab", description: "Unknown selection.", variant: "destructive" });
+        setIsProcessing(false);
+        return;
+      }
+
+      if (!stripePromise || !sessionId) {
+        // toast({ title: "Stripe Error", description: "Stripe.js has not loaded or session ID is missing.", variant: "destructive" });
+        setIsProcessing(false);
+        return;
+      }
+      
+      const stripe = await stripePromise;
+      if (stripe) {
+        const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
+        if (stripeError) {
+          console.error("Stripe checkout error:", stripeError);
+          // toast({ title: "Payment Error", description: stripeError.message || "An error occurred during checkout.", variant: "destructive" });
+        }
+      } else {
+        // toast({ title: "Stripe Error", description: "Stripe.js failed to load.", variant: "destructive" });
+      }
+
+    } catch (error: any) {
+      console.error("Payment processing error:", error);
+      // toast({ title: "Payment Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Handle tab change
@@ -214,11 +360,11 @@ export default function SubscriptionCheckoutPage() {
                     />
 
                     <Button
-                      onClick={() => setCurrentStep("payment")}
+                      onClick={handleProceedToStripeCheckout}
                       className="w-full mt-6 bg-orange-500 hover:bg-orange-600 text-white"
-                      disabled={!subscriptionSelected && !selectedBundleId}
+                      disabled={isProcessing || (!subscriptionSelected && !selectedBundleId)}
                     >
-                      Continue to Payment
+                      {isProcessing ? "Processing..." : "Continue to Payment"}
                     </Button>
 
                     <p className="text-xs text-center text-gray-500 mt-4">
@@ -273,11 +419,11 @@ export default function SubscriptionCheckoutPage() {
                     />
 
                     <Button
-                      onClick={() => setCurrentStep("payment")}
+                      onClick={handleProceedToStripeCheckout}
                       className="w-full mt-6 bg-orange-500 hover:bg-orange-600 text-white"
-                      disabled={!subscriptionSelected}
+                      disabled={isProcessing || !subscriptionSelected}
                     >
-                      Continue to Payment
+                      {isProcessing ? "Processing..." : "Continue to Payment"}
                     </Button>
 
                     <p className="text-xs text-center text-gray-500 mt-4">
@@ -317,13 +463,40 @@ export default function SubscriptionCheckoutPage() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-8">
+              {/* The CheckoutPaymentForm is likely for an embedded Stripe Elements flow.
+                  Since we are using redirectToCheckout, this form might not be used in this specific path.
+                  If currentStep 'payment' is still intended, it implies we'd show a summary
+                  and then redirect, or use Stripe Elements here.
+                  For redirectToCheckout, the "Continue to Payment" button directly triggers the redirect.
+                  So, this "payment" step in the UI might be skipped or simplified.
+                  Let's assume for now that `handleProceedToStripeCheckout` handles the redirect,
+                  and this 'payment' step might be for a different flow or can be removed if only redirect is used.
+                  If this step IS to be shown, then `handleProceedToStripeCheckout` should have been called by a button
+                  on THIS step, not the "select" step.
+                  
+                  Given the current task, `handleProceedToStripeCheckout` is the primary action.
+                  The existence of CheckoutPaymentForm suggests an alternative payment path (Stripe Elements).
+                  We'll keep the structure but note that `redirectToCheckout` bypasses client-side form handling.
+              */}
               <div>
-                <h2 className="text-xl font-medium mb-4">Payment Method</h2>
-                <CheckoutPaymentForm
+                <h2 className="text-xl font-medium mb-4">Confirm Purchase</h2>
+                 <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  You will be redirected to Stripe to complete your payment securely.
+                </p>
+                {/* This button could trigger the redirect if not done on previous step */}
+                {/* <Button onClick={handleProceedToStripeCheckout} disabled={isProcessing} className="w-full bg-orange-500 hover:bg-orange-600 text-white">
+                  {isProcessing ? "Redirecting..." : `Pay $${totalAmount}`}
+                </Button> */}
+                
+                {/* If CheckoutPaymentForm is intended for use with redirectToCheckout, it's a misunderstanding of Stripe flows.
+                    It's typically for Stripe Elements. For now, this component will be "skipped" by the redirect logic.
+                */}
+                <CheckoutPaymentForm 
                   totalAmount={totalAmount}
-                  onPaymentComplete={handlePaymentComplete}
+                  onPaymentComplete={handlePaymentComplete} // This would be called if using Stripe Elements and payment succeeds client-side
                   isProcessing={isProcessing}
                   setIsProcessing={setIsProcessing}
+                  clientSecret={clientSecretForPaymentForm} // Pass client secret if using Payment Intents with Elements
                 />
               </div>
 

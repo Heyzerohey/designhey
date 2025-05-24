@@ -33,12 +33,97 @@ export default function CreditsPurchasePage() {
     setSelectedPack(packId);
     setIsProcessing(true);
 
-    // Simulate API call to Stripe
-    setTimeout(() => {
+    // Helper to get user auth details (replace with your actual auth context/logic)
+    const getAuthHeaders = () => {
+      const token = localStorage.getItem("sessionToken");
+      const userDataString = localStorage.getItem("userData");
+      const userData = userDataString ? JSON.parse(userDataString) : null;
+
+      if (!token || !userData?.id || !userData?.email) {
+        // toast({ title: "Authentication Error", description: "User not authenticated. Please log in.", variant: "destructive" });
+        throw new Error("User not authenticated. Please log in.");
+      }
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'x-user-id': userData.id,
+        'x-user-email': userData.email,
+      };
+    };
+
+    // Ensure your Stripe Publishable Key is in your .env file (e.g., VITE_STRIPE_PUBLISHABLE_KEY)
+    const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+    const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
+    
+    // Backend API URL
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
+
+    // Map frontend pack IDs to Stripe Price IDs (from .env or config)
+    // These should match the keys used in SIGNATURE_PACK_PRICE_IDS in backend stripeService.js
+    const CREDIT_PACK_STRIPE_PRICE_IDS: Record<string, string> = {
+      'pack-5': import.meta.env.VITE_SIGNATURE_PACK_PRICE_ID_5 || 'price_placeholder_pack_5',
+      'pack-10': import.meta.env.VITE_SIGNATURE_PACK_PRICE_ID_10 || 'price_placeholder_pack_10',
+      'pack-25': import.meta.env.VITE_SIGNATURE_PACK_PRICE_ID_25 || 'price_placeholder_pack_25',
+      'pack-50': import.meta.env.VITE_SIGNATURE_PACK_PRICE_ID_50 || 'price_placeholder_pack_50',
+      'pack-100': import.meta.env.VITE_SIGNATURE_PACK_PRICE_ID_100 || 'price_placeholder_pack_100',
+    };
+
+    const stripePackPriceId = CREDIT_PACK_STRIPE_PRICE_IDS[packId];
+
+    if (!stripePackPriceId) {
+      console.error(`Stripe Price ID not found for pack: ${packId}`);
+      // toast({ title: "Error", description: "Could not find payment information for this pack.", variant: "destructive" });
       setIsProcessing(false);
-      // In a real implementation, redirect to Stripe checkout
-      alert("Redirecting to payment gateway...");
-    }, 1500);
+      return;
+    }
+
+    let authHeaders;
+    try {
+      authHeaders = getAuthHeaders();
+    } catch (error: any) {
+      // toast({ title: "Authentication Error", description: error.message, variant: "destructive" });
+      setIsProcessing(false);
+      return;
+    }
+
+    const callApi = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/stripe/create-checkout-session-for-packs`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ priceId: stripePackPriceId, quantity: 1 }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to create checkout session.');
+        }
+        
+        const sessionId = data.sessionId;
+        if (!stripePromise || !sessionId) {
+          // toast({ title: "Stripe Error", description: "Stripe.js has not loaded or session ID is missing.", variant: "destructive" });
+          return;
+        }
+
+        const stripe = await stripePromise;
+        if (stripe) {
+          const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
+          if (stripeError) {
+            console.error("Stripe checkout error:", stripeError);
+            // toast({ title: "Payment Error", description: stripeError.message || "An error occurred during checkout.", variant: "destructive" });
+          }
+        } else {
+           // toast({ title: "Stripe Error", description: "Stripe.js failed to load.", variant: "destructive" });
+        }
+      } catch (error: any) {
+        console.error("Payment processing error:", error);
+        // toast({ title: "Payment Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    callApi();
   };
 
   return (

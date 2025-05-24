@@ -10,28 +10,38 @@ export default function LoginPage() {
   const [error, setError] = useState<string | undefined>();
   const [loginSuccess, setLoginSuccess] = useState(false);
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
+
   const handleLogin = async (email: string, password: string) => {
     setIsLoading(true);
     setError(undefined);
 
     try {
-      // This would be replaced with actual authentication logic
-      // For example: await supabase.auth.signInWithPassword({ email, password })
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const data = await response.json();
 
-      // For demo purposes, simulate successful login
-      if (email === "demo@example.com" && password === "password123") {
-        // Set login success state
+      if (response.ok) {
+        // Store session and user data (example: using localStorage)
+        // Note: For production, consider more secure token storage like HttpOnly cookies or secure state management
+        localStorage.setItem("sessionToken", data.session.access_token); // Or data.session?.access_token
+        localStorage.setItem("userData", JSON.stringify(data.user));    // Or data.user
+        
+        // Set login success state (which will trigger UI change and redirect)
         setLoginSuccess(true);
+        
+        // Optionally, you can directly navigate here too if not relying on loginSuccess state for redirection
+        // navigate('/dashboard'); // Make sure 'navigate' from 'react-router-dom' is available if you use this
       } else {
-        // Simulate authentication error
-        setError("Invalid email or password");
+        setError(data.error || "Invalid email or password. Please try again.");
       }
     } catch (err) {
-      console.error("Login error:", err);
-      setError("An unexpected error occurred. Please try again.");
+      console.error("Login API error:", err);
+      setError("An unexpected error occurred. Please try again later.");
     } finally {
       setIsLoading(false);
     }

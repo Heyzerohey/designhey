@@ -10,28 +10,37 @@ export default function SignupPage() {
   const [error, setError] = useState<string | undefined>();
   const [signupSuccess, setSignupSuccess] = useState(false);
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
+
   const handleSignup = async (email: string, password: string) => {
     setIsLoading(true);
     setError(undefined);
 
     try {
-      // This would be replaced with actual signup logic
-      // For example: await supabase.auth.signUp({ email, password })
+      // Note: The AuthForm currently doesn't collect 'businessName'.
+      // If 'businessName' is required or beneficial for signup, AuthForm and this handler would need adjustment.
+      // For now, we'll proceed without it, as the backend's 'business_name' is optional.
+      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password /* business_name: "Optional Business Name" */ }),
+      });
 
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const data = await response.json();
 
-      // For demo purposes, simulate successful signup
-      if (email !== "taken@example.com") {
-        // Set signup success state
-        setSignupSuccess(true);
+      if (response.status === 201) { // HTTP 201 for successful creation
+        setSignupSuccess(true); // This will trigger UI change to show success message and link.
+        // The backend currently returns:
+        // { message: 'Signup successful. Please check your email for confirmation if enabled.', 
+        //   user: authData.user, profile: profileData[0], credits: creditsData[0] }
+        // We are not directly logging the user in or storing tokens here,
+        // as email confirmation might be pending. The user will be redirected to login.
       } else {
-        // Simulate signup error
-        setError("This email is already in use");
+        setError(data.error || "Could not create account. Please try again.");
       }
     } catch (err) {
-      console.error("Signup error:", err);
-      setError("An unexpected error occurred. Please try again.");
+      console.error("Signup API error:", err);
+      setError("An unexpected error occurred. Please try again later.");
     } finally {
       setIsLoading(false);
     }
