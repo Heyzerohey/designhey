@@ -8,10 +8,16 @@ import "./index.css";
 window.React = React;
 window.ReactDOM = ReactDOM;
 
+import { AuthProvider } from './AuthContext'; // Adjust path if needed
+import { Toaster } from '@/components/ui/sonner'; // Assuming sonner is used for toasts
+
 function Main() {
   return (
     <React.StrictMode>
-      <App />
+      <AuthProvider>
+        <App />
+        <Toaster richColors position="top-right" />
+      </AuthProvider>
     </React.StrictMode>
   );
 }

@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import SignheyLogo from "@/polymet/components/signhey-logo";
 import HomeNavigation from "@/polymet/components/home-navigation";
-import PricingTable from "@/polymet/components/pricing-table";
+// import PricingTable from "@/polymet/components/pricing-table"; // Replaced by ProPlusPricingDetail
+import ProPlusPricingDetail from "../ProPlusPricingDetail"; // Adjust path as needed
 import FaqAccordion from "@/polymet/components/faq-accordion";
 import StoriesSection from "@/polymet/components/stories-section";
 import UpdatedHowItWorksSection from "@/polymet/components/updated-how-it-works-section";
@@ -50,43 +51,8 @@ export default function Homepage() {
       {/* Trust Narrative Section */}
       <TrustNarrativeSection />
 
-      {/* Pricing Preview */}
-      <section id="pricing" className="py-16 bg-white dark:bg-gray-950">
-        <div className="container mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-4">
-            Simple, transparent pricing
-          </h2>
-          <p className="text-center text-gray-600 dark:text-gray-300 mb-12 max-w-xl mx-auto">
-            Choose the plan that fits your needs. All plans include our core
-            features.
-          </p>
-
-          <PricingTable />
-
-          <div className="text-center mt-10">
-            <Link
-              to="/pricing"
-              className="inline-flex items-center text-orange-500 hover:text-orange-600 font-medium"
-            >
-              Compare all plans
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 ml-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* Pricing Preview - Replaced with ProPlusPricingDetail */}
+      <ProPlusPricingDetail />
 
       {/* FAQ */}
       <section id="faq" className="py-16 bg-gray-50 dark:bg-gray-900/50">

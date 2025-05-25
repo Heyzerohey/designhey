@@ -1,8 +1,9 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 // Marketing & Authentication Pages
-import HomePage from "@/polymet/pages/home";
-import UpdatedHomePage from "@/polymet/pages/updated-home";
+// import HomePage from "@/polymet/pages/home"; // To be deleted
+import ActualHomepage from "@/polymet/pages/homepage"; // Renamed import for clarity during transition
+// import UpdatedHomePage from "@/polymet/pages/updated-home"; // To be deleted
 import LoginPage from "@/polymet/pages/login";
 import SignupPage from "@/polymet/pages/signup";
 import ContactPage from "@/polymet/pages/contact";
@@ -27,8 +28,9 @@ import PaymentPage from "@/polymet/pages/payment";
 
 // Dashboard Pages
 import DashboardLayout from "@/polymet/components/dashboard-layout";
-import DashboardPage from "@/polymet/pages/dashboard";
-import DashboardUpdatedPage from "@/polymet/pages/dashboard-updated";
+// import DashboardPage from "@/polymet/pages/dashboard"; // To be deleted
+// import DashboardUpdatedPage from "@/polymet/pages/dashboard-updated"; // To be deleted
+import NewDashboardPage from "../NewDashboardPage"; // Adjust path if NewDashboardPage.tsx is not in polymet/pages
 import ClientsPage from "@/polymet/pages/clients";
 import ClientDetailsPage from "@/polymet/pages/client-details";
 import PackageDetailsPage from "@/polymet/pages/package-details";
@@ -37,17 +39,18 @@ import CreditsPurchasePage from "@/polymet/pages/credits-purchase";
 import ActivityLogPage from "@/polymet/pages/activity-log";
 import MessagesPage from "@/polymet/pages/messages";
 import CaseDetailsPage from "@/polymet/pages/case-details";
+import SignerPackageViewPage from "../SignerPackageViewPage"; // Adjust path if needed
 
 export default function SignheyFinal() {
   return (
     <Router>
       <Routes>
         {/* Marketing Pages */}
-        <Route path="/" element={<UpdatedHomePage />} />
+        <Route path="/" element={<ActualHomepage />} /> 
 
-        <Route path="/home" element={<HomePage />} />
+        {/* <Route path="/home" element={<HomePage />} /> // Route for old home.tsx to be removed */}
 
-        <Route path="/updated-home" element={<UpdatedHomePage />} />
+        {/* <Route path="/updated-home" element={<UpdatedHomePage />} /> // Route for old updated-home.tsx to be removed */}
 
         <Route path="/contact" element={<ContactPage />} />
 
@@ -92,19 +95,19 @@ export default function SignheyFinal() {
           path="/dashboard"
           element={
             <DashboardLayout>
-              <DashboardUpdatedPage />
+              <NewDashboardPage />
             </DashboardLayout>
           }
         />
 
-        <Route
-          path="/dashboard/legacy"
+        {/* <Route
+          path="/dashboard/legacy" // Old dashboard route to be removed
           element={
             <DashboardLayout>
               <DashboardPage />
             </DashboardLayout>
           }
-        />
+        /> */}
 
         {/* Client Management Routes */}
         <Route
@@ -331,6 +334,9 @@ export default function SignheyFinal() {
             </DashboardLayout>
           }
         />
+
+        {/* Signer Flow Page (Public) */}
+        <Route path="/signer/:signerLinkID" element={<SignerPackageViewPage />} />
 
         {/* Fallback for undefined routes */}
         <Route path="*" element={<NotFoundPage />} />

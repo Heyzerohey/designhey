@@ -6,9 +6,11 @@ import { CheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-  const [loginSuccess, setLoginSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Local loading state for the form
+  const [error, setError] = useState<string | undefined>(); // Local error state for the form
+  // const [loginSuccess, setLoginSuccess] = useState(false); // loginSuccess state might no longer be needed locally
+  const navigate = useNavigate(); // For redirection after successful login
+  const { login: authLogin, isLoading: authIsLoading } = useAuth(); // Use login from AuthContext
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
 
@@ -25,53 +27,29 @@ export default function LoginPage() {
 
       const data = await response.json();
 
-      if (response.ok) {
-        // Store session and user data (example: using localStorage)
-        // Note: For production, consider more secure token storage like HttpOnly cookies or secure state management
-        localStorage.setItem("sessionToken", data.session.access_token); // Or data.session?.access_token
-        localStorage.setItem("userData", JSON.stringify(data.user));    // Or data.user
-        
-        // Set login success state (which will trigger UI change and redirect)
-        setLoginSuccess(true);
-        
-        // Optionally, you can directly navigate here too if not relying on loginSuccess state for redirection
-        // navigate('/dashboard'); // Make sure 'navigate' from 'react-router-dom' is available if you use this
+      if (response.ok && data.user && data.session) {
+        // Call login from AuthContext
+        authLogin(data.user, data.session.access_token);
+        toast.success("Login Successful! Redirecting...");
+        // setLoginSuccess(true); // Context now handles the user state
+        navigate('/dashboard'); // Redirect to dashboard after successful login and context update
       } else {
-        setError(data.error || "Invalid email or password. Please try again.");
+        const errorMessage = data.error || "Invalid email or password. Please try again.";
+        setError(errorMessage);
+        toast.error(errorMessage);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Login API error:", err);
-      setError("An unexpected error occurred. Please try again later.");
+      const errorMessage = err.message || "An unexpected error occurred. Please try again later.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // If login is successful, show a success message with a link to dashboard
-  if (loginSuccess) {
-    return (
-      <AuthLayout
-        title="Login Successful"
-        description="You have been successfully logged in"
-      >
-        <div className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
-              <CheckIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
-          </div>
-          <p className="text-muted-foreground">
-            Redirecting you to your dashboard...
-          </p>
-          <Link to="/dashboard">
-            <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-              Go to Dashboard
-            </Button>
-          </Link>
-        </div>
-      </AuthLayout>
-    );
-  }
+  // loginSuccess state and its related UI can be removed if AuthContext handles redirection
+  // For example, App.tsx or a ProtectedRoute component can watch useAuth().user and redirect.
 
   return (
     <AuthLayout
@@ -81,8 +59,8 @@ export default function LoginPage() {
       <AuthForm
         type="login"
         onSubmit={handleLogin}
-        isLoading={isLoading}
-        error={error}
+        isLoading={isLoading || authIsLoading} // Combine local and auth loading states
+        error={error} 
       />
 
       <div className="text-center">

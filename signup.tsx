@@ -35,12 +35,19 @@ export default function SignupPage() {
         //   user: authData.user, profile: profileData[0], credits: creditsData[0] }
         // We are not directly logging the user in or storing tokens here,
         // as email confirmation might be pending. The user will be redirected to login.
+        toast.success(data.message || "Signup successful! Please check your email if confirmation is required, then log in.");
+        // Redirect to login page or show a message to check email.
+        // For now, we set signupSuccess, which shows a message and link to onboarding/login.
+        // Consider navigating to login: navigate('/login');
       } else {
         setError(data.error || "Could not create account. Please try again.");
+        toast.error(data.error || "Signup failed. Please try again.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Signup API error:", err);
-      setError("An unexpected error occurred. Please try again later.");
+      const errorMessage = err.message || "An unexpected error occurred. Please try again later.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -48,10 +55,12 @@ export default function SignupPage() {
 
   // If signup is successful, show a success message with a link to onboarding
   if (signupSuccess) {
+    // The toast in handleSignup already informed the user.
+    // This UI provides a clear next step.
     return (
       <AuthLayout
-        title="Account Created"
-        description="Your account has been successfully created"
+        title="Account Created!"
+        description="Your account has been successfully created."
       >
         <div className="text-center space-y-4">
           <div className="flex justify-center">
@@ -60,13 +69,23 @@ export default function SignupPage() {
             </div>
           </div>
           <p className="text-muted-foreground">
-            Let's get your account set up!
+            Please check your email if confirmation is required.
+            You can now proceed to login or set up your account further if applicable.
           </p>
-          <Link to="/onboarding">
-            <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-              Continue to Onboarding
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+            <Link to="/login">
+              <Button className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white">
+                Go to Login
+              </Button>
+            </Link>
+            {/* Optionally, if direct onboarding is possible or desired after email confirmation:
+            <Link to="/onboarding">
+              <Button variant="outline" className="w-full sm:w-auto">
+                Start Onboarding
+              </Button>
+            </Link>
+            */}
+          </div>
         </div>
       </AuthLayout>
     );
@@ -81,7 +100,7 @@ export default function SignupPage() {
         type="signup"
         onSubmit={handleSignup}
         isLoading={isLoading}
-        error={error}
+        error={error} // This error is set for the AuthForm to display inline if needed
       />
 
       <div className="text-center text-xs text-muted-foreground">

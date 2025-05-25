@@ -29,20 +29,39 @@ import {
   PlusIcon,
   ChevronDownIcon,
   LogOutIcon,
+  UserCircleIcon, // Alternative for user icon
 } from "lucide-react";
 import SignheyLogo from "@/polymet/components/signhey-logo";
-import DashboardHeader from "@/polymet/components/dashboard-header";
+// import DashboardHeader from "@/polymet/components/dashboard-header"; // Header is part of this layout
 import DashboardSidebar from "@/polymet/components/dashboard-sidebar";
+import { useAuth } from "../AuthContext"; // Adjust path as needed
+import { toast } from "sonner";
 
 export default function DashboardLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, logout: authLogout, isLoading: authIsLoading } = useAuth();
 
   const handleLogout = () => {
-    // Here you would typically clear authentication tokens, user data, etc.
-    // For now, we'll just redirect to the homepage
-    navigate("/");
+    authLogout();
+    toast.success("You have been successfully logged out.");
+    navigate("/login"); // Redirect to login page after logout
   };
+  
+  // Handle loading state for authentication
+  if (authIsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Loading session...</p> {/* Replace with a proper loader/spinner component */}
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated and not loading
+  if (!user) {
+    navigate("/login", { replace: true });
+    return null; // Render nothing while redirecting
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -125,35 +144,34 @@ export default function DashboardLayout({ children }) {
                 size="sm"
                 className="relative h-8 flex items-center gap-2 rounded-full"
               >
-                <div className="h-8 w-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-500">
-                  JD
-                </div>
-                <span className="hidden md:inline-flex">John Doe</span>
+                {user?.email ? (
+                  <div className="h-8 w-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-500">
+                    {user.email.substring(0, 2).toUpperCase()} 
+                  </div>
+                ) : (
+                  <UserCircleIcon className="h-8 w-8 text-gray-500" />
+                )}
+                <span className="hidden md:inline-flex">{user?.email || "User"}</span>
                 <ChevronDownIcon className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel>{user?.email || "My Account"}</DropdownMenuLabel>
               <DropdownMenuSeparator />
 
-              <DropdownMenuItem>
-                <Link to="/profile" className="flex w-full">
-                  Profile
-                </Link>
+              <DropdownMenuItem onClick={() => navigate("/dashboard/settings/profile")}>
+                  Profile & Settings
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Link to="/settings" className="flex w-full">
-                  Settings
-                </Link>
+               <DropdownMenuItem onClick={() => navigate("/dashboard/billing")}>
+                  Billing & Credits
               </DropdownMenuItem>
               <DropdownMenuSeparator />
 
               <DropdownMenuItem
                 onClick={handleLogout}
-                className="cursor-pointer"
+                className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
               >
                 <LogOutIcon className="mr-2 h-4 w-4" />
-
                 <span>Logout</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
